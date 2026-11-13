@@ -1,0 +1,44 @@
+name: test
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  distro:
+    runs-on: ubuntu-24.04-arm
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ["ubuntu:20.04", "ubuntu:22.04", "ubuntu:24.04", "debian:11-slim", "debian:12-slim", "rockylinux:8-minimal", "rockylinux:9-minimal", "amazonlinux:2023", "fedora:41", "opensuse/leap:15.6", "oraclelinux:8-slim", "desktop"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: ffmpeg-8.1.2-linux-arm64
+          path: out
+          run-id: 43526466215
+          github-token: ${{ github.token }}
+      - name: Run matrix
+        run: |
+          chmod +x out/bin/* test/*.sh
+          if [ "${{ matrix.image }}" = desktop ]; then
+            docker run --rm -v $PWD/out/bin:/ff:ro -v $PWD/test:/t:ro ubuntu:24.04 sh -c "apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq libva2 libva-drm2 libpulse0 libasound2t64 libxcb1 libxcb-shm0 libudev1 >/dev/null && echo '== desktop libraries installed' && sh /t/run.sh"
+          else
+            docker run --rm -v $PWD/out/bin:/ff:ro -v $PWD/test:/t:ro ${{ matrix.image }} sh /t/run.sh
+          fi
+  lists:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: ffmpeg-8.1.2-linux-arm64
+          path: out
+          run-id: 43526466215
+          github-token: ${{ github.token }}
+      - run: |
+          chmod +x out/bin/* test/*.sh
+          sh test/lists.sh out/bin/ffmpeg lists
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lists-arm64
+          path: lists/
